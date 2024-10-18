@@ -1,0 +1,62 @@
+
+services:
+  db:
+    container_name: db
+    image: mysql:8.0
+    env_file: .env
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=wordpress
+    volumes:
+      - dbdata:/var/lib/mysql
+    networks:
+      - app-network
+
+  wordpress:
+    depends_on:
+      - db
+    container_name: wordpress
+    image: wordpress:6.5.4-php8.1-fpm-alpine
+    restart: unless-stopped
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: $MYSQL_USER
+      WORDPRESS_DB_PASSWORD: $MYSQL_PASSWORD
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - wordpress:/var/www/html
+    networks:
+      - app-network
+
+  webserver:
+    depends_on:
+      - wordpress
+    container_name: webserver
+    image: nginx:1.27.0-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - wordpress:/var/www/html
+      - ./nginx-conf:/etc/nginx/conf.d
+    networks:
+      - app-network
+  certbot:
+    depends_on:
+      - webserver
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - wordpress:/var/www/html
+    command: certonly --webroot --webroot-path=/var/www/html --email longlikun@your_domain --agree-tos --no-eff-email --staging -d your_domain -d www.your_domain
+
+volumes:
+  wordpress:
+  dbdata:
+  certbot-etc:
+
+networks:
+  app-network:
+    driver: bridge
+
